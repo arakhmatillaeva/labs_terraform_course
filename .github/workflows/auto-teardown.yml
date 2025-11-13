@@ -1,0 +1,65 @@
+name: Auto-Teardown Infrastructure
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'  # Every 2 hours
+  workflow_dispatch:
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          
+      - name: Check for expired resources
+        run: |
+          # Find all student-work directories with terraform state
+          for dir in week-*/lab-*/student-work; do
+            if [ -f "$dir/terraform.tfstate" ]; then
+              echo "Checking $dir for expired resources..."
+              
+              # Check if resources have AutoTeardown tag
+              # This is a simplified example - actual implementation would parse state
+              cd "$dir"
+              
+              # Check age of resources (example logic)
+              STATE_AGE=$(stat -c %Y terraform.tfstate)
+              CURRENT_TIME=$(date +%s)
+              AGE_HOURS=$(( ($CURRENT_TIME - $STATE_AGE) / 3600 ))
+              
+              if [ $AGE_HOURS -gt 8 ]; then
+                echo "Resources in $dir are older than 8 hours, destroying..."
+                terraform init
+                terraform destroy -auto-approve || true
+                
+                # Create notification issue
+                STUDENT=$(grep -oP 'Student\s*=\s*"\K[^"]+' *.tf || echo "unknown")
+                echo "EXPIRED_DIR=$dir" >> $GITHUB_ENV
+                echo "STUDENT=$STUDENT" >> $GITHUB_ENV
+              fi
+              
+              cd - > /dev/null
+            fi
+          done
+          
+      - name: Notify student
+        if: env.EXPIRED_DIR != ''
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Auto-teardown: ${process.env.EXPIRED_DIR}`,
+              body: `@${process.env.STUDENT} Your infrastructure in \`${process.env.EXPIRED_DIR}\` has been automatically destroyed after 8 hours to prevent runaway costs.`
+            });

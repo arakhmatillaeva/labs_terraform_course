@@ -1,0 +1,27 @@
+# Example backend configuration for remote state storage
+# Copy this file to your lab directory and rename to backend.tf
+# Update the values as needed
+
+# Option 1: S3 Backend with Native Locking (Recommended for AWS)
+# Terraform 1.9+ supports native S3 state locking without DynamoDB
+terraform {
+  backend "s3" {
+    bucket         = "terraform-state-YOUR-ACCOUNT-ID"
+    key            = "week-XX/lab-YY/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    use_lockfile   = true
+  }
+}
+
+# Option 2: Local Backend (Default - for learning only)
+# terraform {
+#   backend "local" {
+#     path = "terraform.tfstate"
+#   }
+# }
+
+# To set up S3 backend:
+# 1. Create S3 bucket: aws s3 mb s3://terraform-state-YOUR-ACCOUNT-ID
+# 2. Enable versioning: aws s3api put-bucket-versioning --bucket terraform-state-YOUR-ACCOUNT-ID --versioning-configuration Status=Enabled
+# 3. That's it! Native S3 locking is now built-in (Terraform 1.9+)

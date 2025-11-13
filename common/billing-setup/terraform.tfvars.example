@@ -1,0 +1,6 @@
+# Copy this file to terraform.tfvars and update with your information
+# DO NOT commit terraform.tfvars to Git (it's in .gitignore)
+
+student_name         = "your-github-username"
+alert_email          = "your-email@example.com"
+monthly_budget_limit = "20"
